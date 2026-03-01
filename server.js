@@ -25,6 +25,8 @@ function normalizeReason(raw) {
   if (/^בית$|^בבית$/.test(s)) return 'בבית';
   if (/^(כולם|כולנו|כל הצוות|כל הצות|הצוות)\s+(בבית|בית)$/.test(s)) return 'בבית';
   if (/^(בבית|בית)\s*[-–,]/.test(s)) return 'בבית'; // "בבית - הערה"
+  // ── "doctor in unit + staff at home" – must come before the generic בבית catch-all ──
+  if (/רופא.*ביחידה|ביחידה.*סיוע.*בבית/i.test(s)) return 'רופא ביחידה וסיועת בבית';
   if (/\bבבית\b/.test(s) && !/כוננות/.test(s)) return 'בבית';
 
   // ── "home standby" family ────────────────────────────────────────────────
