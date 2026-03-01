@@ -14,16 +14,16 @@ const STATUS_HE = {
 const STATUS_COLORS = {
   open:          '#16a34a',
   closed:        '#dc2626',
-  emergency:     '#d97706',
-  emergency_day: '#f59e0b',
+  emergency:     '#0369a1',
+  emergency_day: '#ea580c',
   unknown:       '#94a3b8'
 };
 
 const STATUS_BG = {
   open:          '#dcfce7',
   closed:        '#fee2e2',
-  emergency:     '#fef3c7',
-  emergency_day: '#fffbeb',
+  emergency:     '#e0f2fe',
+  emergency_day: '#ffedd5',
   unknown:       '#f1f5f9'
 };
 
@@ -625,7 +625,7 @@ function renderAverages(data) {
 
 // ─── Drill-down modal ──────────────────────────────────────────────────────────
 function statusEmoji(status) {
-  return { open: '✅', closed: '🔴', emergency: '🟡', emergency_day: '🟠', unknown: '❓' }[status] || '📋';
+  return { open: '✅', closed: '🔴', emergency: '🔵', emergency_day: '🟠', unknown: '❓' }[status] || '📋';
 }
 
 function openDrill(title, color, icon, clinics, total) {
