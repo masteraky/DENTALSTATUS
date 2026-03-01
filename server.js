@@ -15,6 +15,25 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 // ─── In-memory cache ─────────────────────────────────────────────────────────
 let dataCache = { rows: null, timestamp: 0 };
 
+// ─── Reason normalisation (closed-clinic "where is staff" field) ─────────────
+function normalizeReason(raw) {
+  const s = (raw || '').trim();
+  if (!s) return 'לא צוין';
+
+  // ── "at home" family ──────────────────────────────────────────────────────
+  // matches: "בית", "בבית", "כולם בבית", "כל הצוות בבית", "כולנו בבית", etc.
+  if (/^בית$|^בבית$/.test(s)) return 'בבית';
+  if (/^(כולם|כולנו|כל הצוות|כל הצות|הצוות)\s+(בבית|בית)$/.test(s)) return 'בבית';
+  if (/^(בבית|בית)\s*[-–,]/.test(s)) return 'בבית'; // "בבית - הערה"
+  if (/\bבבית\b/.test(s) && !/כוננות/.test(s)) return 'בבית';
+
+  // ── "home standby" family ────────────────────────────────────────────────
+  // matches: "כוננות בית", "כוננות בית להקפצה", "כוננות מהבית", etc.
+  if (/כוננות.*(בית|מהבית)|בית.*כוננות/.test(s)) return 'כוננות בית';
+
+  return s;
+}
+
 // ─── Status normalisation ────────────────────────────────────────────────────
 function normalizeStatus(raw) {
   if (!raw) return 'unknown';
@@ -29,11 +48,19 @@ function normalizeStatus(raw) {
 function parseSheetDate(str) {
   if (!str) return null;
   const s = str.trim();
-  // M/D/YYYY  or  MM/DD/YYYY
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m) return new Date(+m[3], +m[1] - 1, +m[2]);
+  // M/D/YYYY, M/D/YY, MM/DD/YYYY, MM/DD/YY
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m) {
+    let year = +m[3];
+    if (year < 100) year += 2000; // "25" → 2025, never 1925
+    const d = new Date(year, +m[1] - 1, +m[2]);
+    // Sanity-check: reject clearly-wrong dates (before 2020 or far future)
+    if (d.getFullYear() < 2020 || d.getFullYear() > 2099) return null;
+    return d;
+  }
   const d = new Date(s);
-  return isNaN(d) ? null : d;
+  if (isNaN(d) || d.getFullYear() < 2020) return null;
+  return d;
 }
 
 function toYMD(date) {
@@ -189,12 +216,27 @@ function buildStats(filteredRows, allRows) {
     ? Math.round(deduped.length / dateKeys.length)
     : deduped.length;
 
+  // --- closed clinic team locations breakdown ---
+  // Groups closed clinics by the free-text "what did staff do?" notes field
+  const closedBreakdownMap = {};
+  for (const r of deduped) {
+    if (r.status !== 'closed') continue;
+    const reason = normalizeReason(r.notes);
+    if (!closedBreakdownMap[reason]) closedBreakdownMap[reason] = [];
+    closedBreakdownMap[reason].push({ clinic: r.clinic, command: r.command });
+  }
+  // Sort by count descending
+  const closedBreakdown = Object.entries(closedBreakdownMap)
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([reason, clinics]) => ({ reason, clinics, count: clinics.length }));
+
   return {
     statusCounts,
     commandStats,
     perDate,
     reported,
     notReported,
+    closedBreakdown,
     totalReported:    reported.length,
     totalNotReported: notReported.length,
     totalClinics:     allClinics.length,

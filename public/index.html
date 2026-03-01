@@ -132,6 +132,15 @@
     </div>
   </section>
 
+  <!-- ── Closed clinic team locations ── -->
+  <section id="closedSection" class="card hidden">
+    <h2 class="card-title">
+      📍 מיקום צוות — מרפאות סגורות
+      <span id="closedTotal" class="list-count">0</span>
+    </h2>
+    <div id="closedBreakdown" class="closed-breakdown"></div>
+  </section>
+
   <!-- ── Clinic lists ── -->
   <section class="lists-row">
 
@@ -173,6 +182,22 @@
 </main>
 
 <!-- ══════════════════  LOADING OVERLAY  ══════════════════ -->
+<!-- ══════════════════  DRILL-DOWN MODAL  ══════════════════ -->
+<div id="drillModal" class="drill-modal hidden" role="dialog" aria-modal="true">
+  <div class="drill-backdrop" id="drillBackdrop"></div>
+  <div class="drill-panel">
+    <div class="drill-header">
+      <div class="drill-header-left">
+        <span id="drillIcon" class="drill-icon"></span>
+        <h3 id="drillTitle">פירוט</h3>
+        <span id="drillBadge" class="drill-badge"></span>
+      </div>
+      <button id="drillClose" class="drill-close" aria-label="סגור">✕</button>
+    </div>
+    <div id="drillContent" class="drill-content"></div>
+  </div>
+</div>
+
 <div id="overlay" class="overlay">
   <div class="spinner"></div>
   <p>טוען נתונים…</p>

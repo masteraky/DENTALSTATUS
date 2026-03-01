@@ -31,6 +31,7 @@ let trendChart = null;
 let filterMode = 'single';
 let allReported  = [];
 let allMissing   = [];
+let currentData  = null;   // full API response, used by drill-down
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -70,6 +71,11 @@ document.addEventListener('DOMContentLoaded', () => {
   searchMiss.addEventListener('input',  renderLists);
   filterCmd.addEventListener('change',  renderLists);
 
+  // Drill-down modal close
+  $('drillClose').addEventListener('click', closeDrill);
+  $('drillBackdrop').addEventListener('click', closeDrill);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrill(); });
+
   bootstrap();
 });
 
@@ -93,6 +99,7 @@ async function bootstrap() {
     }
 
     // Auto-load the last date
+    currentData = data;
     renderDashboard(data);
     updateTimestamp();
   } catch (err) {
@@ -120,6 +127,7 @@ async function loadData() {
     const resp = await fetch(url);
     const data = await resp.json();
     if (!data.success) throw new Error(data.error);
+    currentData = data;
     renderDashboard(data);
     updateTimestamp();
   } catch (err) {
@@ -144,7 +152,7 @@ async function refreshData() {
 function renderDashboard(data) {
   const {
     statusCounts, commandStats, perDate,
-    reported, notReported,
+    reported, notReported, closedBreakdown,
     totalReported, totalNotReported, totalClinics,
     isRange, dateCount, avgReported
   } = data;
@@ -156,10 +164,22 @@ function renderDashboard(data) {
   $('kpiReported').textContent  = totalReported;
   $('kpiMissing').textContent   = totalNotReported;
 
-  const rate = totalClinics > 0
-    ? Math.round((totalReported / totalClinics) * 100)
-    : 0;
-  $('kpiRate').textContent = `${rate}%`;
+  const rateCard = $('kpiRate').closest('.kpi-card');
+  if (isRange) {
+    // In range mode: show average daily reports instead of a misleading %
+    const days = (data.dateCount && data.dateCount > 0) ? data.dateCount : 1;
+    const avgDay = Math.round(totalReported / days);
+    $('kpiRate').textContent = avgDay;
+    $('kpiRate').closest('.kpi-body').querySelector('.kpi-lbl').textContent = 'ממוצע דיווחים/יום';
+    rateCard.style.opacity = '1';
+  } else {
+    const rate = totalClinics > 0
+      ? Math.round((totalReported / totalClinics) * 100)
+      : 0;
+    $('kpiRate').textContent = `${rate}%`;
+    $('kpiRate').closest('.kpi-body').querySelector('.kpi-lbl').textContent = 'אחוז דיווח';
+    rateCard.style.opacity = '1';
+  }
 
   // Populate command filter
   const commands = [...new Set([...reported, ...notReported].map(r => r.command).filter(Boolean))].sort();
@@ -169,6 +189,9 @@ function renderDashboard(data) {
   // Charts
   renderPie(statusCounts);
   renderBar(commandStats);
+
+  // Closed team breakdown
+  renderClosedBreakdown(closedBreakdown, statusCounts.closed || 0);
 
   // Trend (range only)
   if (isRange && perDate && Object.keys(perDate).length > 1) {
@@ -207,6 +230,13 @@ function renderPie(statusCounts) {
   const ctx = $('pieChart').getContext('2d');
   if (pieChart) pieChart.destroy();
 
+  // Map label index back to status key for drill-down
+  const labelToStatus = {};
+  labels.forEach((lbl, i) => {
+    const key = Object.keys(STATUS_HE).find(k => STATUS_HE[k] === lbl);
+    if (key) labelToStatus[i] = key;
+  });
+
   pieChart = new Chart(ctx, {
     type: 'doughnut',
     data: {
@@ -222,6 +252,7 @@ function renderPie(statusCounts) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      cursor: 'pointer',
       plugins: {
         legend: {
           position: 'bottom',
@@ -237,10 +268,24 @@ function renderPie(statusCounts) {
             label(ctx) {
               const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
               const pct   = total ? Math.round((ctx.parsed / total) * 100) : 0;
-              return `  ${ctx.label}: ${ctx.parsed} (${pct}%)`;
+              return `  ${ctx.label}: ${ctx.parsed} (${pct}%) — לחץ לפירוט`;
             }
           }
         }
+      },
+      onClick(event, elements) {
+        if (!elements.length) return;
+        const idx    = elements[0].index;
+        const status = labelToStatus[idx];
+        if (!status || !currentData) return;
+        const clinics = (currentData.reported || []).filter(r => r.status === status);
+        openDrill(
+          STATUS_HE[status],
+          STATUS_COLORS[status],
+          statusEmoji(status),
+          clinics,
+          clinics.length
+        );
       },
       cutout: '58%'
     }
@@ -294,9 +339,28 @@ function renderBar(commandStats) {
         tooltip: {
           callbacks: {
             title: items => `פיקוד: ${items[0].label}`,
-            label: ctx  => `  ${ctx.dataset.label}: ${ctx.parsed.y}`
+            label: ctx  => `  ${ctx.dataset.label}: ${ctx.parsed.y} — לחץ לפירוט`
           }
         }
+      },
+      onClick(event, elements) {
+        if (!elements.length || !currentData) return;
+        const el         = elements[0];
+        const command    = commands[el.index];
+        // datasetIndex: 0=open, 1=emergency, 2=closed
+        const statusKeys = ['open', 'emergency', 'closed'];
+        const status     = statusKeys[el.datasetIndex];
+        if (!status || !command) return;
+        const clinics = (currentData.reported || []).filter(
+          r => r.command === command && r.status === status
+        );
+        openDrill(
+          `${command} — ${STATUS_HE[status]}`,
+          STATUS_COLORS[status],
+          statusEmoji(status),
+          clinics,
+          clinics.length
+        );
       },
       scales: {
         x: {
@@ -410,6 +474,50 @@ function renderLists() {
     : '<div class="empty-state">✅ כל המרפאות דיווחו!</div>';
 }
 
+// ─── Closed clinic team breakdown ─────────────────────────────────────────────
+function renderClosedBreakdown(breakdown, totalClosed) {
+  const section = $('closedSection');
+  const container = $('closedBreakdown');
+
+  if (!breakdown || breakdown.length === 0 || totalClosed === 0) {
+    section.classList.add('hidden');
+    return;
+  }
+
+  section.classList.remove('hidden');
+  $('closedTotal').textContent = totalClosed;
+
+  container.innerHTML = breakdown.map(({ reason, clinics, count }) => {
+    const pct = totalClosed > 0 ? Math.round((count / totalClosed) * 100) : 0;
+    // Sort clinics by command then name
+    const sorted = [...clinics].sort((a, b) =>
+      (a.command || '').localeCompare(b.command || '', 'he') ||
+      a.clinic.localeCompare(b.clinic, 'he')
+    );
+    const clinicTags = sorted.map(c =>
+      `<span class="clinic-tag" title="${esc(c.command || '')}">${esc(c.clinic)}</span>`
+    ).join('');
+
+    return `
+      <div class="closed-reason-block">
+        <div class="closed-reason-header">
+          <div class="closed-reason-text">
+            <span class="closed-reason-icon">📌</span>
+            <span class="closed-reason-label">${esc(reason)}</span>
+          </div>
+          <div class="closed-reason-meta">
+            <span class="closed-reason-count">${count} מרפאות</span>
+            <span class="closed-reason-pct">${pct}%</span>
+          </div>
+        </div>
+        <div class="closed-reason-bar">
+          <div class="closed-reason-bar-fill" style="width:${pct}%"></div>
+        </div>
+        <div class="closed-reason-clinics">${clinicTags}</div>
+      </div>`;
+  }).join('');
+}
+
 // ─── Range averages ────────────────────────────────────────────────────────────
 function renderAverages(data) {
   const { statusCounts, totalReported, totalClinics, dateCount, avgReported, perDate } = data;
@@ -464,6 +572,58 @@ function renderAverages(data) {
       <span class="avg-item-val" style="color:var(--c-rate)">${reportRate}%</span>
     </div>
   `;
+}
+
+// ─── Drill-down modal ──────────────────────────────────────────────────────────
+function statusEmoji(status) {
+  return { open: '✅', closed: '🔴', emergency: '🟡', unknown: '❓' }[status] || '📋';
+}
+
+function openDrill(title, color, icon, clinics, total) {
+  $('drillTitle').textContent = title;
+  $('drillIcon').textContent  = icon;
+  $('drillBadge').textContent = `${total} מרפאות`;
+  $('drillBadge').style.background = color + '22';
+  $('drillBadge').style.color      = color;
+
+  // Group by command, sorted Hebrew
+  const byCmd = {};
+  for (const c of clinics) {
+    const cmd = c.command || 'לא צוין';
+    if (!byCmd[cmd]) byCmd[cmd] = [];
+    byCmd[cmd].push(c);
+  }
+
+  $('drillContent').innerHTML = Object.entries(byCmd).length
+    ? Object.entries(byCmd)
+        .sort((a, b) => a[0].localeCompare(b[0], 'he'))
+        .map(([cmd, list]) => `
+          <div class="drill-group">
+            <div class="drill-group-header">
+              ${esc(cmd)}
+              <span class="drill-group-count">${list.length}</span>
+            </div>
+            ${list
+              .sort((a, b) => a.clinic.localeCompare(b.clinic, 'he'))
+              .map(c => `
+                <div class="drill-clinic-row">
+                  <span class="drill-clinic-name">${esc(c.clinic)}</span>
+                  ${c.status
+                    ? `<span class="badge badge-${c.status}">${STATUS_HE[c.status] || ''}</span>`
+                    : ''}
+                </div>`)
+              .join('')}
+          </div>`)
+        .join('')
+    : '<div class="empty-state">אין נתונים</div>';
+
+  $('drillModal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDrill() {
+  $('drillModal').classList.add('hidden');
+  document.body.style.overflow = '';
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
