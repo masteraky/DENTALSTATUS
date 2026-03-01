@@ -54,6 +54,7 @@ function normalizeStatus(raw) {
   if (!raw) return 'unknown';
   const s = raw.trim();
   if (s.includes('כרגיל'))                                   return 'open';
+  if (s.includes('שעות היום'))                               return 'emergency_day';
   if (s.includes('עזרה ראשונה') || s.includes('חירום'))     return 'emergency';
   if (s.includes('סגור'))                                    return 'closed';
   return 'unknown';
@@ -181,7 +182,7 @@ function buildStats(filteredRows, allRows) {
   const deduped = dedup(filteredRows);
 
   // --- status totals ---
-  const statusCounts = { open: 0, closed: 0, emergency: 0, unknown: 0 };
+  const statusCounts = { open: 0, closed: 0, emergency: 0, emergency_day: 0, unknown: 0 };
 
   // --- per-command breakdown ---
   const commandStats = {};
@@ -193,13 +194,13 @@ function buildStats(filteredRows, allRows) {
     statusCounts[r.status] = (statusCounts[r.status] || 0) + 1;
 
     if (!commandStats[r.command]) {
-      commandStats[r.command] = { open: 0, closed: 0, emergency: 0, unknown: 0, total: 0 };
+      commandStats[r.command] = { open: 0, closed: 0, emergency: 0, emergency_day: 0, unknown: 0, total: 0 };
     }
     commandStats[r.command][r.status]++;
     commandStats[r.command].total++;
 
     if (!perDate[r.reportDateStr]) {
-      perDate[r.reportDateStr] = { open: 0, closed: 0, emergency: 0, total: 0 };
+      perDate[r.reportDateStr] = { open: 0, closed: 0, emergency: 0, emergency_day: 0, total: 0 };
     }
     perDate[r.reportDateStr][r.status]++;
     perDate[r.reportDateStr].total++;

@@ -4,24 +4,27 @@
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const STATUS_HE = {
-  open:      'פתוחה',
-  closed:    'סגורה',
-  emergency: 'חירום בלבד',
-  unknown:   'לא ידוע'
+  open:          'פתוחה',
+  closed:        'סגורה',
+  emergency:     'חירום 24/7',
+  emergency_day: 'חירום שעות יום',
+  unknown:       'לא ידוע'
 };
 
 const STATUS_COLORS = {
-  open:      '#16a34a',
-  closed:    '#dc2626',
-  emergency: '#d97706',
-  unknown:   '#94a3b8'
+  open:          '#16a34a',
+  closed:        '#dc2626',
+  emergency:     '#d97706',
+  emergency_day: '#f59e0b',
+  unknown:       '#94a3b8'
 };
 
 const STATUS_BG = {
-  open:      '#dcfce7',
-  closed:    '#fee2e2',
-  emergency: '#fef3c7',
-  unknown:   '#f1f5f9'
+  open:          '#dcfce7',
+  closed:        '#fee2e2',
+  emergency:     '#fef3c7',
+  emergency_day: '#fffbeb',
+  unknown:       '#f1f5f9'
 };
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -182,9 +185,10 @@ function renderDashboard(data) {
   } = data;
 
   // KPIs
-  $('kpiOpen').textContent      = statusCounts.open      || 0;
-  $('kpiEmergency').textContent = statusCounts.emergency || 0;
-  $('kpiClosed').textContent    = statusCounts.closed    || 0;
+  $('kpiOpen').textContent         = statusCounts.open          || 0;
+  $('kpiEmergency').textContent    = statusCounts.emergency     || 0;
+  $('kpiEmergencyDay').textContent = statusCounts.emergency_day || 0;
+  $('kpiClosed').textContent       = statusCounts.closed        || 0;
   $('kpiReported').textContent  = totalReported;
   $('kpiMissing').textContent   = totalNotReported;
 
@@ -334,9 +338,15 @@ function renderBar(commandStats) {
           borderRadius: 0
         },
         {
-          label: 'חירום בלבד',
+          label: STATUS_HE.emergency,
           data: commands.map(c => commandStats[c].emergency || 0),
           backgroundColor: STATUS_COLORS.emergency,
+          borderRadius: 0
+        },
+        {
+          label: STATUS_HE.emergency_day,
+          data: commands.map(c => commandStats[c].emergency_day || 0),
+          backgroundColor: STATUS_COLORS.emergency_day,
           borderRadius: 0
         },
         {
@@ -371,8 +381,8 @@ function renderBar(commandStats) {
         if (!elements.length || !currentData) return;
         const el         = elements[0];
         const command    = commands[el.index];
-        // datasetIndex: 0=open, 1=emergency, 2=closed
-        const statusKeys = ['open', 'emergency', 'closed'];
+        // datasetIndex: 0=open, 1=emergency, 2=emergency_day, 3=closed
+        const statusKeys = ['open', 'emergency', 'emergency_day', 'closed'];
         const status     = statusKeys[el.datasetIndex];
         if (!status || !command) return;
         const clinics = (currentData.reported || []).filter(
@@ -419,9 +429,14 @@ function renderTrend(perDate) {
           backgroundColor: STATUS_COLORS.open
         },
         {
-          label: 'חירום בלבד',
+          label: STATUS_HE.emergency,
           data: sortedDates.map(d => perDate[d].emergency || 0),
           backgroundColor: STATUS_COLORS.emergency
+        },
+        {
+          label: STATUS_HE.emergency_day,
+          data: sortedDates.map(d => perDate[d].emergency_day || 0),
+          backgroundColor: STATUS_COLORS.emergency_day
         },
         {
           label: 'סגורה',
@@ -546,17 +561,19 @@ function renderClosedBreakdown(breakdown, totalClosed) {
 function renderAverages(data) {
   const { statusCounts, totalReported, totalClinics, dateCount, avgReported, perDate } = data;
 
-  const totalStatuses = (statusCounts.open || 0) + (statusCounts.closed || 0) + (statusCounts.emergency || 0);
-  const pctOpen  = totalStatuses ? Math.round(((statusCounts.open      || 0) / totalStatuses) * 100) : 0;
-  const pctClose = totalStatuses ? Math.round(((statusCounts.closed    || 0) / totalStatuses) * 100) : 0;
-  const pctEmerg = totalStatuses ? Math.round(((statusCounts.emergency || 0) / totalStatuses) * 100) : 0;
+  const totalStatuses = (statusCounts.open || 0) + (statusCounts.closed || 0) + (statusCounts.emergency || 0) + (statusCounts.emergency_day || 0);
+  const pctOpen     = totalStatuses ? Math.round(((statusCounts.open          || 0) / totalStatuses) * 100) : 0;
+  const pctClose    = totalStatuses ? Math.round(((statusCounts.closed        || 0) / totalStatuses) * 100) : 0;
+  const pctEmerg    = totalStatuses ? Math.round(((statusCounts.emergency     || 0) / totalStatuses) * 100) : 0;
+  const pctEmergDay = totalStatuses ? Math.round(((statusCounts.emergency_day || 0) / totalStatuses) * 100) : 0;
 
   // Per-day averages
   const dateKeys = Object.keys(perDate || {});
-  const totalDays = dateKeys.length || 1;
-  const avgOpen   = Math.round((statusCounts.open      || 0) / totalDays);
-  const avgClosed = Math.round((statusCounts.closed    || 0) / totalDays);
-  const avgEmerg  = Math.round((statusCounts.emergency || 0) / totalDays);
+  const totalDays  = dateKeys.length || 1;
+  const avgOpen     = Math.round((statusCounts.open          || 0) / totalDays);
+  const avgClosed   = Math.round((statusCounts.closed        || 0) / totalDays);
+  const avgEmerg    = Math.round((statusCounts.emergency     || 0) / totalDays);
+  const avgEmergDay = Math.round((statusCounts.emergency_day || 0) / totalDays);
 
   const reportRate = totalClinics > 0
     ? Math.round((totalReported / (totalClinics * totalDays)) * 100)
@@ -572,8 +589,12 @@ function renderAverages(data) {
       <span class="avg-item-val" style="color:var(--c-open)">${pctOpen}%</span>
     </div>
     <div class="avg-item">
-      <span class="avg-item-lbl">אחוז חירום (ממוצע)</span>
+      <span class="avg-item-lbl">אחוז חירום 24/7 (ממוצע)</span>
       <span class="avg-item-val" style="color:var(--c-emerg)">${pctEmerg}%</span>
+    </div>
+    <div class="avg-item">
+      <span class="avg-item-lbl">אחוז חירום שעות יום (ממוצע)</span>
+      <span class="avg-item-val" style="color:var(--c-emerg-day)">${pctEmergDay}%</span>
     </div>
     <div class="avg-item">
       <span class="avg-item-lbl">אחוז סגורות (ממוצע)</span>
@@ -584,8 +605,12 @@ function renderAverages(data) {
       <span class="avg-item-val" style="color:var(--c-open)">${avgOpen}</span>
     </div>
     <div class="avg-item">
-      <span class="avg-item-lbl">ממוצע חירום ליום</span>
+      <span class="avg-item-lbl">ממוצע חירום 24/7 ליום</span>
       <span class="avg-item-val" style="color:var(--c-emerg)">${avgEmerg}</span>
+    </div>
+    <div class="avg-item">
+      <span class="avg-item-lbl">ממוצע חירום שעות יום ליום</span>
+      <span class="avg-item-val" style="color:var(--c-emerg-day)">${avgEmergDay}</span>
     </div>
     <div class="avg-item">
       <span class="avg-item-lbl">ממוצע סגורות ליום</span>
@@ -600,7 +625,7 @@ function renderAverages(data) {
 
 // ─── Drill-down modal ──────────────────────────────────────────────────────────
 function statusEmoji(status) {
-  return { open: '✅', closed: '🔴', emergency: '🟡', unknown: '❓' }[status] || '📋';
+  return { open: '✅', closed: '🔴', emergency: '🟡', emergency_day: '🟠', unknown: '❓' }[status] || '📋';
 }
 
 function openDrill(title, color, icon, clinics, total) {
