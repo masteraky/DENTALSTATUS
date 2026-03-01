@@ -79,35 +79,48 @@ document.addEventListener('DOMContentLoaded', () => {
   bootstrap();
 });
 
-// ─── Bootstrap: load available dates then render ───────────────────────────────
+// ─── Bootstrap: discover available dates, then load last date ─────────────────
 async function bootstrap() {
   showLoading(true);
   try {
+    // Fetch unfiltered data only to discover available date range
     const resp = await fetch('/api/data');
     const data = await resp.json();
     if (!data.success) throw new Error(data.error);
 
     const dates = data.dates || [];
-    if (dates.length) {
-      const last  = dates[dates.length - 1];
-      const first = dates[0];
-      singleDate.value = last;
-      startDate.value  = first;
-      endDate.value    = last;
-      dateHint.textContent =
-        `נתונים זמינים: ${fmtDate(first)} עד ${fmtDate(last)} (${dates.length} ימים)`;
+    if (!dates.length) {
+      showLoading(false);
+      return; // no data at all
     }
 
-    // Auto-load the last date
-    currentData = data;
-    renderDashboard(data);
-    updateTimestamp();
+    const first = dates[0];
+    const last  = dates[dates.length - 1];
+
+    // Pick the most recent date that has more than 1 report,
+    // to avoid outlier/typo dates (e.g. someone entered a future date) as the default.
+    const perDate = data.perDate || {};
+    const significant = Object.keys(perDate)
+      .filter(d => perDate[d].total > 1)
+      .sort();
+    const defaultDate = significant.length
+      ? significant[significant.length - 1]
+      : last;
+
+    singleDate.value = defaultDate;
+    startDate.value  = first;
+    endDate.value    = last;
+    dateHint.textContent =
+      `נתונים זמינים: ${fmtDate(first)} עד ${fmtDate(last)} (${dates.length} ימים)`;
   } catch (err) {
     console.error(err);
     alert('שגיאה בטעינת נתונים: ' + err.message);
-  } finally {
     showLoading(false);
+    return;
   }
+  showLoading(false);
+  // Load filtered data for the last available date
+  await loadData();
 }
 
 // ─── Load data for selected filter ────────────────────────────────────────────

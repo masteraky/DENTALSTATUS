@@ -144,12 +144,12 @@ function dedup(rows) {
   return [...map.values()];
 }
 
-/** Filter all rows to a date window */
-function filterRows(all, start, end) {
+/** Filter all rows to a date window (compare YYYY-MM-DD strings to avoid timezone issues) */
+function filterRows(all, startStr, endStr) {
   return all.filter(r => {
-    if (!r.reportDate) return false;
-    if (start && r.reportDate < start) return false;
-    if (end   && r.reportDate > end)   return false;
+    if (!r.reportDateStr) return false;
+    if (startStr && r.reportDateStr < startStr) return false;
+    if (endStr   && r.reportDateStr > endStr)   return false;
     return true;
   });
 }
@@ -254,17 +254,18 @@ app.get('/api/data', async (req, res) => {
     const all = await getCached();
     const { date, startDate, endDate } = req.query;
 
-    let start = null, end = null;
+    // Use YYYY-MM-DD strings for filtering to avoid UTC/local-time timezone issues
+    let startStr = null, endStr = null;
 
     if (date) {
-      start = new Date(date);
-      end   = new Date(date); end.setHours(23, 59, 59, 999);
+      startStr = date;
+      endStr   = date;
     } else if (startDate || endDate) {
-      if (startDate) start = new Date(startDate);
-      if (endDate)   { end = new Date(endDate); end.setHours(23, 59, 59, 999); }
+      if (startDate) startStr = startDate;
+      if (endDate)   endStr   = endDate;
     }
 
-    const filtered = (start || end) ? filterRows(all, start, end) : all;
+    const filtered = (startStr || endStr) ? filterRows(all, startStr, endStr) : all;
     const stats    = buildStats(filtered, all);
 
     res.json({ success: true, isRange: !!(startDate || endDate), ...stats });
