@@ -618,15 +618,17 @@ function openDrill(title, color, icon, clinics, total) {
     byCmd[cmd].push(c);
   }
 
-  $('drillContent').innerHTML = Object.entries(byCmd).length
-    ? Object.entries(byCmd)
-        .sort((a, b) => a[0].localeCompare(b[0], 'he'))
-        .map(([cmd, list]) => `
-          <div class="drill-group">
-            <div class="drill-group-header">
-              ${esc(cmd)}
-              <span class="drill-group-count">${list.length}</span>
-            </div>
+  const entries = Object.entries(byCmd).sort((a, b) => a[0].localeCompare(b[0], 'he'));
+
+  $('drillContent').innerHTML = entries.length
+    ? entries.map(([cmd, list]) => `
+        <div class="drill-group">
+          <div class="drill-group-header">
+            <span class="drill-chevron">▾</span>
+            ${esc(cmd)}
+            <span class="drill-group-count">${list.length}</span>
+          </div>
+          <div class="drill-group-body">
             ${list
               .sort((a, b) => a.clinic.localeCompare(b.clinic, 'he'))
               .map(c => `
@@ -637,9 +639,17 @@ function openDrill(title, color, icon, clinics, total) {
                     : ''}
                 </div>`)
               .join('')}
-          </div>`)
-        .join('')
+          </div>
+        </div>`)
+      .join('')
     : '<div class="empty-state">אין נתונים</div>';
+
+  // Wire up collapse/expand on each group header
+  $('drillContent').querySelectorAll('.drill-group-header').forEach(header => {
+    header.addEventListener('click', () => {
+      header.closest('.drill-group').classList.toggle('collapsed');
+    });
+  });
 
   $('drillModal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
