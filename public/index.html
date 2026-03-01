@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>דשבורד מצב מרפאות שיניים</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ══════════════════  HEADER  ══════════════════ -->
+<header>
+  <div class="header-inner">
+    <div class="header-brand">
+      <span class="brand-icon">🦷</span>
+      <div>
+        <h1>דשבורד מצב מרפאות</h1>
+        <p class="brand-sub">שירותי רפואת שיניים · חיתוך מצב יומי</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span id="lastUpdated" class="last-updated"></span>
+      <button id="refreshBtn" class="btn-ghost">⟳ רענן נתונים</button>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════  MAIN  ══════════════════ -->
+<main>
+
+  <!-- ── Filter bar ── -->
+  <section class="filter-bar card">
+    <div class="filter-row">
+
+      <div class="filter-group">
+        <label class="filter-label">סוג חיפוש</label>
+        <div class="toggle-group">
+          <button class="toggle-btn active" data-mode="single">תאריך בודד</button>
+          <button class="toggle-btn" data-mode="range">תקופה</button>
+        </div>
+      </div>
+
+      <div id="singlePicker" class="filter-group">
+        <label class="filter-label">תאריך</label>
+        <input type="date" id="singleDate" class="date-input" />
+      </div>
+
+      <div id="rangePicker" class="filter-group hidden">
+        <label class="filter-label">מ-</label>
+        <input type="date" id="startDate" class="date-input" />
+        <label class="filter-label">עד</label>
+        <input type="date" id="endDate" class="date-input" />
+      </div>
+
+      <button id="applyBtn" class="btn-primary">הצג נתונים</button>
+    </div>
+
+    <p id="dateHint" class="date-hint"></p>
+  </section>
+
+  <!-- ── KPI cards ── -->
+  <section class="kpi-grid">
+    <div class="kpi-card kpi-open">
+      <div class="kpi-icon">✅</div>
+      <div class="kpi-body">
+        <span class="kpi-val" id="kpiOpen">–</span>
+        <span class="kpi-lbl">פתוחות</span>
+      </div>
+    </div>
+    <div class="kpi-card kpi-emergency">
+      <div class="kpi-icon">🟡</div>
+      <div class="kpi-body">
+        <span class="kpi-val" id="kpiEmergency">–</span>
+        <span class="kpi-lbl">חירום בלבד</span>
+      </div>
+    </div>
+    <div class="kpi-card kpi-closed">
+      <div class="kpi-icon">🔴</div>
+      <div class="kpi-body">
+        <span class="kpi-val" id="kpiClosed">–</span>
+        <span class="kpi-lbl">סגורות</span>
+      </div>
+    </div>
+    <div class="kpi-card kpi-reported">
+      <div class="kpi-icon">📋</div>
+      <div class="kpi-body">
+        <span class="kpi-val" id="kpiReported">–</span>
+        <span class="kpi-lbl">דיווחו</span>
+      </div>
+    </div>
+    <div class="kpi-card kpi-missing">
+      <div class="kpi-icon">⚠️</div>
+      <div class="kpi-body">
+        <span class="kpi-val" id="kpiMissing">–</span>
+        <span class="kpi-lbl">לא דיווחו</span>
+      </div>
+    </div>
+    <div class="kpi-card kpi-rate">
+      <div class="kpi-icon">📈</div>
+      <div class="kpi-body">
+        <span class="kpi-val" id="kpiRate">–</span>
+        <span class="kpi-lbl">אחוז דיווח</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Charts ── -->
+  <section class="charts-row">
+    <div class="card chart-card">
+      <h2 class="card-title">פילוח מצב מרפאות</h2>
+      <div class="chart-wrap">
+        <canvas id="pieChart"></canvas>
+      </div>
+    </div>
+
+    <div class="card chart-card chart-card--wide">
+      <h2 class="card-title">מצב לפי פיקוד</h2>
+      <div class="chart-wrap">
+        <canvas id="barChart"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Range trend (visible only in range mode) ── -->
+  <section id="trendSection" class="card hidden">
+    <h2 class="card-title">מגמה יומית לתקופה</h2>
+    <div class="chart-wrap chart-wrap--tall">
+      <canvas id="trendChart"></canvas>
+    </div>
+  </section>
+
+  <!-- ── Clinic lists ── -->
+  <section class="lists-row">
+
+    <div class="card">
+      <h2 class="card-title list-title list-title--ok">
+        <span class="list-dot dot-ok">✔</span>
+        דיווחו
+        <span class="list-count" id="reportedCount">0</span>
+      </h2>
+      <div class="list-filter">
+        <input type="text" id="searchReported" placeholder="חיפוש מרפאה..." class="search-input" />
+        <select id="filterCommand" class="select-input">
+          <option value="">כל הפיקודים</option>
+        </select>
+      </div>
+      <div id="reportedList" class="clinic-list"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title list-title list-title--err">
+        <span class="list-dot dot-err">✘</span>
+        לא דיווחו
+        <span class="list-count" id="missingCount">0</span>
+      </h2>
+      <div class="list-filter">
+        <input type="text" id="searchMissing" placeholder="חיפוש מרפאה..." class="search-input" />
+      </div>
+      <div id="missingList" class="clinic-list"></div>
+    </div>
+
+  </section>
+
+  <!-- ── Range averages ── -->
+  <section id="avgSection" class="card hidden">
+    <h2 class="card-title">סטטיסטיקות לתקופה</h2>
+    <div id="avgGrid" class="avg-grid"></div>
+  </section>
+
+</main>
+
+<!-- ══════════════════  LOADING OVERLAY  ══════════════════ -->
+<div id="overlay" class="overlay">
+  <div class="spinner"></div>
+  <p>טוען נתונים…</p>
+</div>
+
+<script src="dashboard.js"></script>
+</body>
+</html>
