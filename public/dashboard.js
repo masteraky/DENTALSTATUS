@@ -97,15 +97,26 @@ async function bootstrap() {
     const first = dates[0];
     const last  = dates[dates.length - 1];
 
-    // Pick the most recent date that has more than 1 report,
-    // to avoid outlier/typo dates (e.g. someone entered a future date) as the default.
+    // Pick the best default date:
+    // 1. Today, if it has >1 report
+    // 2. Otherwise, the most recent PAST date (≤ today) with >1 report
+    // 3. Fallback: last date in the list
+    // This prevents future pre-submitted dates from becoming the default.
+    const today = new Date().toISOString().slice(0, 10);
     const perDate = data.perDate || {};
     const significant = Object.keys(perDate)
       .filter(d => perDate[d].total > 1)
       .sort();
-    const defaultDate = significant.length
-      ? significant[significant.length - 1]
-      : last;
+
+    let defaultDate;
+    if (significant.includes(today)) {
+      defaultDate = today;
+    } else {
+      const pastSignificant = significant.filter(d => d <= today);
+      defaultDate = pastSignificant.length
+        ? pastSignificant[pastSignificant.length - 1]
+        : (significant.length ? significant[significant.length - 1] : last);
+    }
 
     singleDate.value = defaultDate;
     startDate.value  = first;
