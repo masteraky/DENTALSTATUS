@@ -34,6 +34,19 @@ function normalizeReason(raw) {
   return s;
 }
 
+// ─── Clinic name normalisation ───────────────────────────────────────────────
+// Hebrew punctuation geresh (׳ U+05F3) and gershayim (״ U+05F4) look identical
+// to ASCII ' and " but are different characters, causing the same clinic to
+// appear under two different keys.  Normalise them to plain ASCII.
+function normalizeClinicName(raw) {
+  return (raw || '')
+    .trim()
+    .replace(/״/g, '"')   // U+05F4 Hebrew Punctuation Gershayim → "
+    .replace(/׳/g, "'")   // U+05F3 Hebrew Punctuation Geresh     → '
+    .replace(/\u201C|\u201D/g, '"')  // curly double quotes → "
+    .replace(/\u2018|\u2019/g, "'"); // curly single quotes → '
+}
+
 // ─── Status normalisation ────────────────────────────────────────────────────
 function normalizeStatus(raw) {
   if (!raw) return 'unknown';
@@ -97,7 +110,7 @@ async function fetchSheet() {
     const timestampRaw  = get('Timestamp',                                              0);
     const reportDateRaw = get('לאיזה תאריך ממלאים?',                                   1);
     const command       = get('פיקוד',                                                  2);
-    const clinic        = get('מרפאה',                                                  3);
+    const clinic        = normalizeClinicName(get('מרפאה',                             3));
     const statusRaw     = get('מצב המרפאה נכון להיום',                                 4);
     const notes         = get('היית והמרפאה סגורה, מה עשה הרופא.ה והצוות?',           5);
 
