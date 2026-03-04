@@ -12,6 +12,8 @@
   --c-emerg-bg:     #e0f2fe;
   --c-emerg-day:    #ea580c;
   --c-emerg-day-bg: #ffedd5;
+  --c-elective:     #9333ea;
+  --c-elective-bg:  #f3e8ff;
   --c-primary:    #2563eb;
   --c-primary-dk: #1d4ed8;
   --c-miss:       #64748b;
@@ -244,6 +246,7 @@ main {
 .kpi-open          { border-right-color: var(--c-open); }
 .kpi-emergency     { border-right-color: var(--c-emerg); }
 .kpi-emergency-day { border-right-color: var(--c-emerg-day); }
+.kpi-elective      { border-right-color: var(--c-elective); }
 .kpi-closed        { border-right-color: var(--c-closed); }
 .kpi-reported  { border-right-color: var(--c-primary); }
 .kpi-missing   { border-right-color: var(--c-miss); }
@@ -399,6 +402,7 @@ main {
 .badge-closed    { background: var(--c-closed-bg); color: var(--c-closed); }
 .badge-emergency     { background: var(--c-emerg-bg);     color: var(--c-emerg); }
 .badge-emergency_day { background: var(--c-emerg-day-bg); color: var(--c-emerg-day); }
+.badge-elective      { background: var(--c-elective-bg);  color: var(--c-elective); }
 .badge-unknown       { background: var(--c-miss-bg);      color: var(--c-miss); }
 
 /* ── Range averages ───────────────────────────── */
